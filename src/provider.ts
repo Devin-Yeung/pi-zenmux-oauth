@@ -8,9 +8,11 @@ import {
   type SimpleStreamOptions,
   type TranscriptContext,
 } from "@earendil-works/pi-ai";
-import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
-import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
-import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
+import {
+  anthropicMessagesApi,
+  openAICompletionsApi,
+  openAIResponsesApi,
+} from "@earendil-works/pi-ai/compat";
 import {
   parseCatalogPayload,
   PROVIDER_ID,
