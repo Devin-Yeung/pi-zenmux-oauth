@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f4f7f3" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0e1210" media="(prefers-color-scheme: dark)" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23107a4c'/%3E%3Cpath d='M9 16.5l4.6 4.5L23 11' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <title>Signed in to ZenMux</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f4f7f3;
+      --card: #ffffff;
+      --line: #e2e8e0;
+      --text: #161a15;
+      --muted: #5c665a;
+      --mark-bg: #e3f3ea;
+      --mark-fg: #107a4c;
+      --wash: rgba(16, 122, 76, 0.06);
+      --shadow: 0 1px 2px rgba(16, 24, 16, 0.04),
+        0 16px 32px -16px rgba(16, 24, 16, 0.16);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e1210;
+        --card: #171d19;
+        --line: #2a332c;
+        --text: #f2f5f1;
+        --muted: #9faa9d;
+        --mark-bg: #16301f;
+        --mark-fg: #4ad08c;
+        --wash: rgba(74, 208, 140, 0.05);
+        --shadow: 0 24px 48px -24px rgba(0, 0, 0, 0.6);
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      min-height: 100svh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      padding: max(24px, env(safe-area-inset-top))
+        max(24px, env(safe-area-inset-right))
+        max(24px, env(safe-area-inset-bottom))
+        max(24px, env(safe-area-inset-left));
+      background:
+        radial-gradient(120% 60% at 50% 0, var(--wash), transparent 70%),
+        var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+        sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+    main {
+      width: min(100%, 420px);
+      padding: clamp(28px, 7vw, 36px);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    .mark {
+      width: 52px;
+      height: 52px;
+      margin: 0 auto 18px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--mark-bg);
+      color: var(--mark-fg);
+    }
+    .mark svg { display: block; }
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(1.375rem, 5vw, 1.5rem);
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      text-wrap: balance;
+    }
+    p {
+      max-width: 34ch;
+      margin: 0 auto;
+      color: var(--muted);
+      text-wrap: pretty;
+    }
+    .hint {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      font-size: 0.875rem;
+    }
+    ::selection { background: var(--mark-bg); }
+    @media (prefers-reduced-motion: no-preference) {
+      main { animation: rise 0.28s ease-out both; }
+      .check { stroke-dasharray: 24; animation: draw 0.4s 0.1s ease-out both; }
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes draw {
+      from { stroke-dashoffset: 24; }
+      to { stroke-dashoffset: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="mark" aria-hidden="true">
+      <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+        <path class="check" d="M6 14.5 11.2 20 22 8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <h1>Signed in to ZenMux</h1>
+    <p>{{message}}</p>
+    <p class="hint" id="hint" hidden>You can close this tab.</p>
+    <noscript>
+      <p class="hint">You can close this tab.</p>
+    </noscript>
+  </main>
+  <script>
+    // The OAuth tab is opened by the browser, not by a script, so window.close()
+    // is best-effort: browsers refuse it for tabs they did not open. If the tab
+    // survives, surface the manual hint instead.
+    setTimeout(function () {
+      window.close();
+      setTimeout(function () {
+        document.getElementById("hint").hidden = false;
+      }, 400);
+    }, 5000);
+  </script>
+</body>
+</html>
