@@ -1,5 +1,9 @@
 import { createServer, type Server } from "node:http";
-import type { OAuthAuth, OAuthCredential, ProviderAuthInteraction } from "@earendil-works/pi-ai";
+import type {
+  OAuthAuth,
+  OAuthCredential,
+  ProviderAuthInteraction,
+} from "@earendil-works/pi-ai";
 import { oauthSuccessHtml } from "@earendil-works/pi-ai/utils/oauth-page";
 import {
   allowInsecureRequests,
@@ -19,14 +23,19 @@ const OAUTH_SCOPES = "inference:invoke offline_access";
 const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000;
 
 function abortError(signal: AbortSignal): Error {
-  return signal.reason instanceof Error ? signal.reason : new Error("ZenMux OAuth was cancelled");
+  return signal.reason instanceof Error
+    ? signal.reason
+    : new Error("ZenMux OAuth was cancelled");
 }
 
 function throwIfAborted(signal: AbortSignal): void {
   if (signal.aborted) throw abortError(signal);
 }
 
-function createOAuthConfiguration(config: ZenMuxConfig, signal: AbortSignal): Configuration {
+function createOAuthConfiguration(
+  config: ZenMuxConfig,
+  signal: AbortSignal,
+): Configuration {
   // ZenMux's fixed endpoints are known, so metadata discovery would add a
   // network dependency to every login and refresh. This is a public client.
   const oauth = new Configuration(
@@ -47,7 +56,9 @@ function createOAuthConfiguration(config: ZenMuxConfig, signal: AbortSignal): Co
       ...init,
       signal: AbortSignal.any([signal, init?.signal ?? signal]),
     } as RequestInit);
-  if (new URL(config.portalOrigin).protocol === "http:") allowInsecureRequests(oauth);
+  // Only reachable through a loopback test origin; production is HTTPS.
+  if (new URL(config.portalOrigin).protocol === "http:")
+    allowInsecureRequests(oauth);
   return oauth;
 }
 
@@ -58,7 +69,8 @@ function toCredential(tokens: {
 }): OAuthCredential {
   // Pi persists rotating refresh tokens and needs a concrete expiry for its
   // locked refresh flow. A partial token response cannot be used safely.
-  if (!tokens.refresh_token) throw new Error("ZenMux did not return a refresh token");
+  if (!tokens.refresh_token)
+    throw new Error("ZenMux did not return a refresh token");
   if (
     typeof tokens.expires_in !== "number" ||
     !Number.isFinite(tokens.expires_in) ||
@@ -108,24 +120,34 @@ async function waitForCallback(
       if (callbackUrl.searchParams.get("state") !== state) {
         response
           .writeHead(400)
-          .end("ZenMux authorization state did not match. You can close this window.");
+          .end(
+            "ZenMux authorization state did not match. You can close this window.",
+          );
         return;
       }
       const oauthError = callbackUrl.searchParams.get("error");
       if (oauthError) {
-        response.writeHead(400).end("ZenMux authorization failed. You can close this window.");
+        response
+          .writeHead(400)
+          .end("ZenMux authorization failed. You can close this window.");
         finish(new Error(oauthError));
         return;
       }
       if (!callbackUrl.searchParams.has("code")) {
         response
           .writeHead(400)
-          .end("ZenMux did not return an authorization code. You can close this window.");
+          .end(
+            "ZenMux did not return an authorization code. You can close this window.",
+          );
         return;
       }
 
       response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      response.end(oauthSuccessHtml("Authorization received. Return to Pi to finish sign-in."));
+      response.end(
+        oauthSuccessHtml(
+          "Authorization received. Return to Pi to finish sign-in.",
+        ),
+      );
       finish(undefined, callbackUrl);
     });
 
@@ -151,7 +173,8 @@ async function waitForCallback(
     server.on("error", (error) => finish(error));
     interaction.signal.addEventListener("abort", onAbort, { once: true });
     timeout = setTimeout(
-      () => finish(new Error("ZenMux OAuth callback timed out after 5 minutes")),
+      () =>
+        finish(new Error("ZenMux OAuth callback timed out after 5 minutes")),
       CALLBACK_TIMEOUT_MS,
     );
     timeout.unref();
@@ -159,11 +182,16 @@ async function waitForCallback(
     server.listen(0, "127.0.0.1", () => {
       const address = server.address();
       if (!address || typeof address === "string") {
-        finish(new Error("Could not determine the ZenMux OAuth callback address"));
+        finish(
+          new Error("Could not determine the ZenMux OAuth callback address"),
+        );
         return;
       }
       redirectUri = `http://127.0.0.1:${address.port}/callback`;
-      interaction.notify({ type: "auth_url", url: authorizationUrl(redirectUri).toString() });
+      interaction.notify({
+        type: "auth_url",
+        url: authorizationUrl(redirectUri).toString(),
+      });
       interaction.notify({
         type: "progress",
         message: "Waiting for ZenMux authorization in your browser…",
@@ -180,14 +208,17 @@ export function createZenMuxOAuth(config: ZenMuxConfig): OAuthAuth {
       const verifier = randomPKCECodeVerifier();
       const challenge = await calculatePKCECodeChallenge(verifier);
       const state = randomState();
-      const callbackUrl = await waitForCallback(interaction, state, (redirectUri) =>
-        buildAuthorizationUrl(oauth, {
-          redirect_uri: redirectUri,
-          scope: OAUTH_SCOPES,
-          state,
-          code_challenge: challenge,
-          code_challenge_method: "S256",
-        }),
+      const callbackUrl = await waitForCallback(
+        interaction,
+        state,
+        (redirectUri) =>
+          buildAuthorizationUrl(oauth, {
+            redirect_uri: redirectUri,
+            scope: OAUTH_SCOPES,
+            state,
+            code_challenge: challenge,
+            code_challenge_method: "S256",
+          }),
       );
       return toCredential(
         await authorizationCodeGrant(oauth, callbackUrl, {

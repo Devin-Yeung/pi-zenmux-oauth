@@ -4,39 +4,42 @@ import { loadConfig } from "../src/config.ts";
 import { createZenMuxProvider } from "../src/provider.ts";
 
 const config = loadConfig({
-  ZENMUX_OAUTH_ORIGIN: "https://oauth.example.test",
-  ZENMUX_OAUTH_CLIENT_ID: "public-client",
   ZENMUX_MODEL_CATALOG_URL: "https://catalog.example.test/models",
-  ZENMUX_TEST_MODEL: "vendor/fallback",
 });
 
-test("catalog refresh overlays the baseline model through Pi's provider", async (t) => {
+test("catalog refresh publishes discovered models through Pi's provider", async (t) => {
   const provider = createZenMuxProvider(config);
   assert.deepEqual(
     provider.getModels().map((model) => model.id),
-    ["vendor/fallback"],
+    [],
   );
   assert.ok(provider.refreshModels);
 
   const calls: string[] = [];
   const originalFetch = globalThis.fetch;
-  t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = input instanceof Request ? input.url : String(input);
-    calls.push(url);
-    assert.equal(url, config.modelCatalogUrl);
-    assert.equal(init?.signal?.aborted, false);
-    return Response.json({
-      success: true,
-      data: [
-        {
-          slug: "vendor/model-v2",
-          name: "Model V2",
-          input_modalities: ["text"],
-          endpoints: [{ supports_reasoning: 0, adapters: [{ api: "messages" }] }],
-        },
-      ],
-    });
-  });
+  t.mock.method(
+    globalThis,
+    "fetch",
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input instanceof Request ? input.url : String(input);
+      calls.push(url);
+      assert.equal(url, config.modelCatalogUrl);
+      assert.equal(init?.signal?.aborted, false);
+      return Response.json({
+        success: true,
+        data: [
+          {
+            slug: "vendor/model-v2",
+            name: "Model V2",
+            input_modalities: ["text"],
+            endpoints: [
+              { supports_reasoning: 0, adapters: [{ api: "messages" }] },
+            ],
+          },
+        ],
+      });
+    },
+  );
 
   await provider.refreshModels({
     allowNetwork: false,
@@ -46,7 +49,7 @@ test("catalog refresh overlays the baseline model through Pi's provider", async 
   assert.deepEqual(calls, []);
   assert.deepEqual(
     provider.getModels().map((model) => model.id),
-    ["vendor/fallback"],
+    [],
   );
 
   let persistedIds: string[] = [];
@@ -55,7 +58,9 @@ test("catalog refresh overlays the baseline model through Pi's provider", async 
     signal: new AbortController().signal,
     publish: async (publication) => {
       publication.update?.();
-      persistedIds = (publication.persist?.models ?? []).map((model) => model.id);
+      persistedIds = (publication.persist?.models ?? []).map(
+        (model) => model.id,
+      );
       return true;
     },
   });
@@ -64,6 +69,6 @@ test("catalog refresh overlays the baseline model through Pi's provider", async 
   assert.deepEqual(persistedIds, ["vendor/model-v2"]);
   assert.deepEqual(
     provider.getModels().map((model) => model.id),
-    ["vendor/fallback", "vendor/model-v2"],
+    ["vendor/model-v2"],
   );
 });

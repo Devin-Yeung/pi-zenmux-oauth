@@ -4,30 +4,40 @@ import test from "node:test";
 import { loadConfig } from "../src/config.ts";
 import { createZenMuxOAuth } from "../src/oauth.ts";
 
-const config = loadConfig({
-  ZENMUX_OAUTH_ORIGIN: "https://oauth.example.test",
-  ZENMUX_OAUTH_CLIENT_ID: "public-client",
-});
+// The endpoint argument exists for in-process callers only; it is not
+// environment-configurable, so tests point the flow at a stand-in origin.
+const config = loadConfig(
+  {},
+  {
+    portalOrigin: "https://oauth.example.test",
+    oauthClientId: "public-client",
+  },
+);
 
 test("OAuth login validates state and PKCE, then refreshes a rotating token", async (t) => {
   const tokenRequests: URLSearchParams[] = [];
   const originalFetch = globalThis.fetch;
-  t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = input instanceof Request ? input.url : String(input);
-    if (new URL(url).origin !== config.portalOrigin) return originalFetch(input, init);
-    assert.equal(url, "https://oauth.example.test/oauth/token");
-    assert.equal(init?.method, "POST");
-    assert.equal(init?.signal?.aborted, false);
-    const body = init?.body;
-    assert.ok(body instanceof URLSearchParams);
-    tokenRequests.push(body);
-    return Response.json({
-      access_token: `access-${tokenRequests.length}`,
-      refresh_token: `refresh-${tokenRequests.length}`,
-      expires_in: 3600,
-      token_type: "Bearer",
-    });
-  });
+  t.mock.method(
+    globalThis,
+    "fetch",
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (new URL(url).origin !== config.portalOrigin)
+        return originalFetch(input, init);
+      assert.equal(url, "https://oauth.example.test/oauth/token");
+      assert.equal(init?.method, "POST");
+      assert.equal(init?.signal?.aborted, false);
+      const body = init?.body;
+      assert.ok(body instanceof URLSearchParams);
+      tokenRequests.push(body);
+      return Response.json({
+        access_token: `access-${tokenRequests.length}`,
+        refresh_token: `refresh-${tokenRequests.length}`,
+        expires_in: 3600,
+        token_type: "Bearer",
+      });
+    },
+  );
   const oauth = createZenMuxOAuth(config);
   let receiveAuthorizationUrl!: (url: URL) => void;
   const authorizationUrl = new Promise<URL>((resolve) => {
@@ -39,7 +49,8 @@ test("OAuth login validates state and PKCE, then refreshes a rotating token", as
       throw new Error("Unexpected prompt");
     },
     notify: (event) => {
-      if (event.type === "auth_url") receiveAuthorizationUrl(new URL(event.url));
+      if (event.type === "auth_url")
+        receiveAuthorizationUrl(new URL(event.url));
     },
   });
 
@@ -48,15 +59,22 @@ test("OAuth login validates state and PKCE, then refreshes a rotating token", as
   assert.equal(url.pathname, "/oauth/authorize");
   assert.equal(url.searchParams.get("client_id"), "public-client");
   assert.equal(url.searchParams.get("code_challenge_method"), "S256");
-  assert.equal(url.searchParams.get("scope"), "inference:invoke offline_access");
+  assert.equal(
+    url.searchParams.get("scope"),
+    "inference:invoke offline_access",
+  );
   const redirectUri = url.searchParams.get("redirect_uri");
   const state = url.searchParams.get("state");
   assert.ok(redirectUri);
   assert.ok(state);
 
-  const rejectedCallback = await fetch(`${redirectUri}?code=ignored&state=wrong`);
+  const rejectedCallback = await fetch(
+    `${redirectUri}?code=ignored&state=wrong`,
+  );
   assert.equal(rejectedCallback.status, 400);
-  const acceptedCallback = await fetch(`${redirectUri}?code=authorization-code&state=${state}`);
+  const acceptedCallback = await fetch(
+    `${redirectUri}?code=authorization-code&state=${state}`,
+  );
   assert.equal(acceptedCallback.status, 200);
   const credential = await login;
   assert.equal(credential.access, "access-1");
@@ -72,7 +90,10 @@ test("OAuth login validates state and PKCE, then refreshes a rotating token", as
     url.searchParams.get("code_challenge"),
   );
 
-  const refreshed = await oauth.refresh(credential, new AbortController().signal);
+  const refreshed = await oauth.refresh(
+    credential,
+    new AbortController().signal,
+  );
   assert.equal(refreshed.access, "access-2");
   assert.equal(refreshed.refresh, "refresh-2");
   assert.equal(tokenRequests[1].get("grant_type"), "refresh_token");
@@ -95,7 +116,8 @@ test("cancelling a pending browser login closes the callback listener", async ()
       throw new Error("Unexpected prompt");
     },
     notify: (event) => {
-      if (event.type === "auth_url") receiveAuthorizationUrl(new URL(event.url));
+      if (event.type === "auth_url")
+        receiveAuthorizationUrl(new URL(event.url));
     },
   });
   const url = await authorizationUrl;

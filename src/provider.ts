@@ -14,7 +14,6 @@ import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.l
 import {
   parseCatalogPayload,
   PROVIDER_ID,
-  toFallbackModel,
   type ZenMuxApi,
   type ZenMuxCatalog,
   type ZenMuxModel,
@@ -22,11 +21,14 @@ import {
 import type { ZenMuxConfig } from "./config.ts";
 import { createZenMuxOAuth } from "./oauth.ts";
 
-function addSessionHeader<T extends { headers?: ProviderHeaders; sessionId?: string }>(
-  options?: T,
-): T | undefined {
+function addSessionHeader<
+  T extends { headers?: ProviderHeaders; sessionId?: string },
+>(options?: T): T | undefined {
   if (!options?.sessionId) return options;
-  return { ...options, headers: { ...options.headers, "x-zenmux-session-id": options.sessionId } };
+  return {
+    ...options,
+    headers: { ...options.headers, "x-zenmux-session-id": options.sessionId },
+  };
 }
 
 function withSessionHeaders(streams: ProviderStreams): ProviderStreams {
@@ -45,9 +47,13 @@ function withSessionHeaders(streams: ProviderStreams): ProviderStreams {
   };
 }
 
-async function fetchCatalog(config: ZenMuxConfig, signal: AbortSignal): Promise<ZenMuxModel[]> {
+async function fetchCatalog(
+  config: ZenMuxConfig,
+  signal: AbortSignal,
+): Promise<ZenMuxModel[]> {
   const response = await fetch(config.modelCatalogUrl, { signal });
-  if (!response.ok) throw new Error(`ZenMux model discovery failed (${response.status})`);
+  if (!response.ok)
+    throw new Error(`ZenMux model discovery failed (${response.status})`);
   // Trust the service schema at the JSON boundary; mapping uses concrete types.
   // Schema changes fail discovery rather than trying unrelated field aliases.
   const payload = (await response.json()) as ZenMuxCatalog;
@@ -57,7 +63,9 @@ async function fetchCatalog(config: ZenMuxConfig, signal: AbortSignal): Promise<
   return models;
 }
 
-export function createZenMuxProvider(config: ZenMuxConfig): Provider<ZenMuxApi> {
+export function createZenMuxProvider(
+  config: ZenMuxConfig,
+): Provider<ZenMuxApi> {
   const apis = {
     "anthropic-messages": withSessionHeaders(anthropicMessagesApi()),
     "openai-responses": withSessionHeaders(openAIResponsesApi()),
@@ -69,7 +77,8 @@ export function createZenMuxProvider(config: ZenMuxConfig): Provider<ZenMuxApi> 
     baseUrl: config.apiBaseUrl,
     headers: { "X-Title": "Pi" },
     auth: { oauth: createZenMuxOAuth(config) },
-    models: [toFallbackModel(config)],
+    // Purely dynamic: the model list is whatever the catalog last published.
+    models: [],
     fetchModels: (context) => fetchCatalog(config, context.signal),
     api: apis,
   });

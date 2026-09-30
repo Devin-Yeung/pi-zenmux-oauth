@@ -2,7 +2,8 @@ import type { Model } from "@earendil-works/pi-ai";
 import type { ZenMuxConfig } from "./config.ts";
 
 export const PROVIDER_ID = "zenmux";
-export type ZenMuxApi = "anthropic-messages" | "openai-responses" | "openai-completions";
+export type ZenMuxApi =
+  "anthropic-messages" | "openai-responses" | "openai-completions";
 export type ZenMuxModel = Model<ZenMuxApi>;
 type Modality = "text" | "image" | "video" | "audio" | "file";
 
@@ -25,7 +26,10 @@ export interface ZenMuxCatalogModel {
   }>;
 }
 
-export function parseCatalogPayload(payload: ZenMuxCatalog, config: ZenMuxConfig): ZenMuxModel[] {
+export function parseCatalogPayload(
+  payload: ZenMuxCatalog,
+  config: ZenMuxConfig,
+): ZenMuxModel[] {
   if (!payload.success) throw new Error("ZenMux model catalog request failed");
   return payload.data.flatMap((source) => {
     const api = resolvePiApi(source);
@@ -35,7 +39,9 @@ export function parseCatalogPayload(payload: ZenMuxCatalog, config: ZenMuxConfig
 
 export function resolvePiApi(model: ZenMuxCatalogModel): ZenMuxApi | undefined {
   const protocols = new Set(
-    model.endpoints.flatMap((endpoint) => endpoint.adapters.map((adapter) => adapter.api)),
+    model.endpoints.flatMap((endpoint) =>
+      endpoint.adapters.map((adapter) => adapter.api),
+    ),
   );
   // Preserve the existing preference; unsupported adapters are non-chat APIs.
   if (protocols.has("messages")) return "anthropic-messages";
@@ -50,7 +56,8 @@ export function toZenMuxModel(
   config: ZenMuxConfig,
 ): ZenMuxModel {
   const input = source.input_modalities.filter(
-    (modality): modality is "text" | "image" => modality === "text" || modality === "image",
+    (modality): modality is "text" | "image" =>
+      modality === "text" || modality === "image",
   );
   const contextWindow = source.context_length ?? 128_000;
   return {
@@ -58,29 +65,19 @@ export function toZenMuxModel(
     name: `ZenMux · ${source.name}`,
     api,
     provider: PROVIDER_ID,
-    baseUrl: api === "anthropic-messages" ? config.anthropicBaseUrl : config.apiBaseUrl,
-    reasoning: source.endpoints.some((endpoint) => endpoint.supports_reasoning > 0),
+    baseUrl:
+      api === "anthropic-messages"
+        ? config.anthropicBaseUrl
+        : config.apiBaseUrl,
+    reasoning: source.endpoints.some(
+      (endpoint) => endpoint.supports_reasoning > 0,
+    ),
     // Pi chat models only represent text/image inputs. File/audio/video are omitted.
     input: input.length > 0 ? input : ["text"],
     // Subscription usage has no per-token cost here; the catalog's tiered PAYG
     // pricing is intentionally omitted. Max output is a conservative local cap.
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: contextWindow > 0 ? contextWindow : 128_000,
-    maxTokens: 16_384,
-  };
-}
-
-export function toFallbackModel(config: ZenMuxConfig): ZenMuxModel {
-  return {
-    id: config.fallbackModelId,
-    name: `ZenMux · ${config.fallbackModelId}`,
-    api: "anthropic-messages",
-    provider: PROVIDER_ID,
-    baseUrl: config.anthropicBaseUrl,
-    reasoning: false,
-    input: ["text"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 128_000,
     maxTokens: 16_384,
   };
 }

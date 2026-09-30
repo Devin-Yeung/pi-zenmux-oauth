@@ -7,8 +7,24 @@ export interface ZenMuxConfig {
   anthropicBaseUrl: string;
   modelCatalogUrl: string;
   oauthClientId: string;
-  fallbackModelId: string;
 }
+
+/**
+ * OAuth endpoints the extension signs in against. Overridable only by an
+ * in-process caller of `loadConfig`, and deliberately not environment
+ * configurable: configuration must not be able to redirect credentials to an
+ * authorization server other than ZenMux's. Tests use this to run the flow
+ * against a staging or loopback origin.
+ */
+export type OAuthEndpoints = Pick<
+  ZenMuxConfig,
+  "portalOrigin" | "oauthClientId"
+>;
+
+const PRODUCTION_OAUTH_ENDPOINTS: OAuthEndpoints = {
+  portalOrigin: PRODUCTION_OAUTH_ORIGIN,
+  oauthClientId: PRODUCTION_OAUTH_CLIENT_ID,
+};
 
 export type Environment = Record<string, string | undefined>;
 
@@ -25,28 +41,10 @@ function normalizeBaseUrl(value: string, name: string): string {
   return value.replace(/\/+$/, "");
 }
 
-function normalizeOrigin(value: string, name: string): string {
-  const baseUrl = normalizeBaseUrl(value, name);
-  const url = new URL(baseUrl);
-  if ((url.pathname !== "" && url.pathname !== "/") || url.search || url.hash) {
-    throw new Error(`${name} must be an origin without a path, query, or fragment`);
-  }
-  return url.origin;
-}
-
-export function loadConfig(env: Environment = process.env): ZenMuxConfig {
-  const portalOrigin = normalizeOrigin(
-    env.ZENMUX_OAUTH_ORIGIN || PRODUCTION_OAUTH_ORIGIN,
-    "ZENMUX_OAUTH_ORIGIN",
-  );
-  // Production has a registered public client. Other origins need their own
-  // client ID; this extension no longer registers or persists clients.
-  const oauthClientId =
-    env.ZENMUX_OAUTH_CLIENT_ID ||
-    (portalOrigin === PRODUCTION_OAUTH_ORIGIN ? PRODUCTION_OAUTH_CLIENT_ID : "");
-  if (!oauthClientId) {
-    throw new Error("ZENMUX_OAUTH_CLIENT_ID is required for a custom ZENMUX_OAUTH_ORIGIN");
-  }
+export function loadConfig(
+  env: Environment = process.env,
+  oauth: OAuthEndpoints = PRODUCTION_OAUTH_ENDPOINTS,
+): ZenMuxConfig {
   const apiBaseUrl = normalizeBaseUrl(
     env.ZENMUX_API_BASE_URL || "https://zenmux.ai/api/v1",
     "ZENMUX_API_BASE_URL",
@@ -61,11 +59,10 @@ export function loadConfig(env: Environment = process.env): ZenMuxConfig {
     "ZENMUX_MODEL_CATALOG_URL",
   );
   return {
-    portalOrigin,
+    portalOrigin: oauth.portalOrigin,
     apiBaseUrl,
     anthropicBaseUrl,
     modelCatalogUrl,
-    oauthClientId,
-    fallbackModelId: env.ZENMUX_TEST_MODEL || "deepseek/deepseek-v4-flash",
+    oauthClientId: oauth.oauthClientId,
   };
 }
