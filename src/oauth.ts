@@ -4,7 +4,7 @@ import type {
   OAuthCredential,
   ProviderAuthInteraction,
 } from "@earendil-works/pi-ai";
-import { oauthSuccessHtml } from "@earendil-works/pi-ai/utils/oauth-page";
+import { oauthSuccessHtml } from "./oauth-page.ts";
 import {
   allowInsecureRequests,
   authorizationCodeGrant,
