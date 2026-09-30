@@ -49,10 +49,10 @@ Production works without additional configuration. These variables are available
 | `ZENMUX_API_BASE_URL`       | `https://zenmux.ai/api/v1`                   | OpenAI-compatible API base URL                                                |
 | `ZENMUX_ANTHROPIC_BASE_URL` | derived as `https://zenmux.ai/api/anthropic` | Anthropic-compatible API base URL                                             |
 | `ZENMUX_MODEL_CATALOG_URL`  | derived from the API origin                  | Model catalog endpoint                                                        |
-| `ZENMUX_TEST_MODEL`         | `deepseek/deepseek-v4-flash`                 | Fallback model when no catalog is available                                   |
+| `ZENMUX_TEST_MODEL`         | `deepseek/deepseek-v4-flash`                 | Baseline model, replaced when the catalog contains the same id                |
 | `ZENMUX_OAUTH_CLIENT_ID`    | bundled for `https://zenmux.ai`              | Required for a custom OAuth origin; overrides the production public client ID |
 
-A successful first catalog refresh can take up to the service's response time. With no Pi catalog cache and offline mode, only the fallback model is available.
+A successful first catalog refresh can take up to the service's response time. With no Pi catalog cache and offline mode, only the baseline model is available. After a refresh, Pi keeps that baseline model and replaces it when the catalog contains the same id.
 
 Custom OAuth origins must have an existing public client registered for loopback redirects and set `ZENMUX_OAUTH_CLIENT_ID`. The extension does not register clients or write a client ID cache.
 Credentials issued to a previously cached client ID may need a new login after this change. Set `ZENMUX_OAUTH_CLIENT_ID` to that ID to continue using the existing grant.

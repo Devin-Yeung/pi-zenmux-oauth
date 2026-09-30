@@ -9,10 +9,13 @@ const config = loadConfig({
   ZENMUX_OAUTH_CLIENT_ID: "public-client",
 });
 
-test("OAuth login validates state and PKCE, then refreshes a rotating token", async () => {
+test("OAuth login validates state and PKCE, then refreshes a rotating token", async (t) => {
   const tokenRequests: URLSearchParams[] = [];
-  const fetchToken: typeof fetch = async (input, init) => {
-    assert.equal(String(input), "https://oauth.example.test/oauth/token");
+  const originalFetch = globalThis.fetch;
+  t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = input instanceof Request ? input.url : String(input);
+    if (new URL(url).origin !== config.portalOrigin) return originalFetch(input, init);
+    assert.equal(url, "https://oauth.example.test/oauth/token");
     assert.equal(init?.method, "POST");
     assert.equal(init?.signal?.aborted, false);
     const body = init?.body;
@@ -24,8 +27,8 @@ test("OAuth login validates state and PKCE, then refreshes a rotating token", as
       expires_in: 3600,
       token_type: "Bearer",
     });
-  };
-  const oauth = createZenMuxOAuth(config, { fetch: fetchToken });
+  });
+  const oauth = createZenMuxOAuth(config);
   let receiveAuthorizationUrl!: (url: URL) => void;
   const authorizationUrl = new Promise<URL>((resolve) => {
     receiveAuthorizationUrl = resolve;

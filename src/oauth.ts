@@ -18,12 +18,6 @@ import type { ZenMuxConfig } from "./config.ts";
 const OAUTH_SCOPES = "inference:invoke offline_access";
 const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000;
 
-type Fetch = typeof globalThis.fetch;
-
-export interface OAuthDependencies {
-  fetch?: Fetch;
-}
-
 function abortError(signal: AbortSignal): Error {
   return signal.reason instanceof Error ? signal.reason : new Error("ZenMux OAuth was cancelled");
 }
@@ -32,11 +26,7 @@ function throwIfAborted(signal: AbortSignal): void {
   if (signal.aborted) throw abortError(signal);
 }
 
-function createOAuthConfiguration(
-  config: ZenMuxConfig,
-  fetchImpl: Fetch,
-  signal: AbortSignal,
-): Configuration {
+function createOAuthConfiguration(config: ZenMuxConfig, signal: AbortSignal): Configuration {
   // ZenMux's fixed endpoints are known, so metadata discovery would add a
   // network dependency to every login and refresh. This is a public client.
   const oauth = new Configuration(
@@ -53,7 +43,7 @@ function createOAuthConfiguration(
   // Preserve Pi's cancellation signal alongside the library's own timeout.
   // Node's RequestInit and openid-client's FetchBody types differ for typed arrays.
   oauth[customFetch] = (input, init) =>
-    fetchImpl(input, {
+    fetch(input, {
       ...init,
       signal: AbortSignal.any([signal, init?.signal ?? signal]),
     } as RequestInit);
@@ -182,16 +172,11 @@ async function waitForCallback(
   });
 }
 
-export function createZenMuxOAuth(
-  config: ZenMuxConfig,
-  dependencies: OAuthDependencies = {},
-): OAuthAuth {
-  const fetchImpl = dependencies.fetch ?? globalThis.fetch;
-
+export function createZenMuxOAuth(config: ZenMuxConfig): OAuthAuth {
   return {
     name: "ZenMux OAuth (PKCE)",
     login: async (interaction) => {
-      const oauth = createOAuthConfiguration(config, fetchImpl, interaction.signal);
+      const oauth = createOAuthConfiguration(config, interaction.signal);
       const verifier = randomPKCECodeVerifier();
       const challenge = await calculatePKCECodeChallenge(verifier);
       const state = randomState();
@@ -213,7 +198,7 @@ export function createZenMuxOAuth(
     },
     refresh: async (credential, signal) => {
       throwIfAborted(signal);
-      const oauth = createOAuthConfiguration(config, fetchImpl, signal);
+      const oauth = createOAuthConfiguration(config, signal);
       return toCredential(await refreshTokenGrant(oauth, credential.refresh));
     },
     toAuth: async (credential: OAuthCredential) => ({
